@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 ##########################################################################
-# Nsap - Copyright (C) CEA, 2013
+# Nsap - Neurospin - Berkeley - Copyright (C) CEA, 2013
 # Distributed under the terms of the CeCILL-B license, as published by
 # the CEA-CNRS-INRIA. Refer to the LICENSE file or to
 # http://www.cecill.info/licences/Licence_CeCILL-B_V1-en.html
@@ -115,7 +115,7 @@ def detect_spikes(array, zalph=5., histeresis=True, hthres=2., time_axis=-1,
 
     Parameters
     ----------
-    array: rray (mandatory)
+    array: array (mandatory)
             array where the time is the last dimension.
     zalph: float (optional default 5)
         cut off for the sum of square.
@@ -181,7 +181,105 @@ def detect_spikes(array, zalph=5., histeresis=True, hthres=2., time_axis=-1,
     return slices_to_correct, spikes
 
 
-def spikes_from_slice_diff(smd2, zalph=5., histeresis=True, hthres=2.):
+def add_histeresis(smd2, spikes, lower_spikes, hthres=.15):
+    """ Consider as spike point next to isolated dirak-like spike if they have
+    high rank. Isolated dirak-like spike are those that have no temporal
+    neighbor. High rank : if the rank of the point is within 2*nb_spikes.
+
+    Parameters
+    ----------
+    smd2: array (T-1,) (mandatory)
+        array containing the mean (over voxels in volume) of the
+        squared difference from one time point to the next.
+    spikes: array (T-1,)
+        the detected spikes array.
+    lower_spikes: array (T-1,)
+        the detected histeresis spikes array.
+    hthres: float
+        cut off for histeresis: keep point under threshold zalph if their rank
+        is within hthres times the rank of the original spike.
+
+    Returns
+    -------
+    histeresis_spikes: array (T-1,)
+        the detected histeresis spikes.   
+
+    Raises
+    ------
+    ValueError: if smd2 or spikes arrays have not dimention one.    
+    """
+    # Check the input specified axis parameters
+    if smd2.ndim != 1:
+        raise ValueError("The 'smd2' array must be a one dimention array.")
+    if spikes.ndim != 1:
+        raise ValueError("The 'spikes' array must be a one dimention array.")
+    if lower_spikes.ndim != 1:
+        raise ValueError("The 'lower_spikes' array must be a one dimention array.")
+
+    # Inner parameters
+    histeresis_spikes = np.zeros_like(spikes)
+    shape = smd2.shape
+
+    # The argsort of argsort gives the rank of the original idx, ie.
+    # if we have [2, 9, 1, 4, 3] the rank will be [1, 4, 0, 3, 2].
+    # The rank of the first element is 1 since 2 is the second smallest
+    # value.
+    ranks = np.argsort(np.argsort(smd2))
+    logger.info("The rank index of '%s' is '%s'.", smd2, ranks)
+
+    # Detect the 'diracs' in the time dimension 
+    diracs = detect_dirac_spikes(spikes)
+    index_diracs = np.where(diracs)[0]       
+    logger.info("Diracs indices are '%s'.", index_diracs)
+
+    # Go through the found dirac-like indices
+    for dirac_index in index_diracs:
+
+        # Get the rank of the current dirac-like spike
+        dirac_rank = ranks[dirac_index]
+        logger.info("The rank associated to the dirac index '%s' is "
+                     "'%s'.", dirac_index, dirac_rank)
+
+        # Find in the direct neighbor the closest dirac rank
+        # > consider the max between the one before and the one after
+        if (dirac_index > 0) and (dirac_index < shape[0] - 1):
+            lower_dirac_rank = ranks[dirac_index - 1]
+            upper_dirac_rank = ranks[dirac_index + 1]
+            if lower_dirac_rank > upper_dirac_rank:      
+                max_dirac_rank = lower_dirac_rank
+                histeresis_index = dirac_index - 1
+            else:
+                max_dirac_rank = upper_dirac_rank
+                histeresis_index = dirac_index + 1              
+        # > consider the one after
+        elif dirac_index == 0:
+            max_dirac_rank = ranks[dirac_index + 1]
+            histeresis_index = dirac_index + 1
+        # > consider the one before
+        elif dirac_index == shape[0] - 1:
+            max_dirac_rank = ranks[dirac_index - 1]
+            histeresis_index = dirac_index - 1
+        logger.info("The neighbor closest dirac rank is '%s' at position '%s'.",
+                    max_dirac_rank, histeresis_index)
+
+        # Check that the rank of the original spike is higher
+        if dirac_rank > max_dirac_rank:
+            logger.error("Rank issue.")
+
+        # Check if those two ranks are closed enough, ie. close
+        # within the number of detected spikes.
+        if (dirac_rank - max_dirac_rank <= hthres * dirac_rank + 1 and 
+            lower_spikes[histeresis_index]):
+
+            histeresis_spikes[histeresis_index] = 1
+            logger.info("Found one spike by histeresis at position "
+                        "'%s'.", histeresis_index)
+
+    return histeresis_spikes
+
+
+def spikes_from_slice_diff(smd2, zalph=5., lower_zalph=3., histeresis=True,
+                           hthres=0.15):
     """ Detect spiked slices.
 
     Notation: T is the number of time points (TRs) and S is the number of
@@ -194,6 +292,9 @@ def spikes_from_slice_diff(smd2, zalph=5., histeresis=True, hthres=2.):
         squared difference from one time point to the next
     zalph: float (optional default 5)
         cut off for the sum of square.
+    lower_zalph: float (optional default 3)
+        lower cut off for the sum of square. Used to detect histeresis spikes. 
+        Value must be above this threshold to be a candidate for histeresis.
     histeresis: bool (default True)
         option to consider histeresis-like spikes.
     hthres: float
@@ -213,6 +314,7 @@ def spikes_from_slice_diff(smd2, zalph=5., histeresis=True, hthres=2.):
     # Initialize the detection result
     shape = smd2.shape
     spikes = np.zeros(shape=shape, dtype=np.int)
+    lower_spikes = np.zeros(shape=shape, dtype=np.int)
 
     # Go through all slices
     for slice_index in range(shape[1]):
@@ -226,65 +328,72 @@ def spikes_from_slice_diff(smd2, zalph=5., histeresis=True, hthres=2.):
 
         # Detect the outliers
         spikes[:, slice_index] = (smd2[:, slice_index] >  loc + zalph * scale)
+        lower_spikes[:, slice_index] = (smd2[:, slice_index] >  loc +
+                                        lower_zalph * scale)
         nb_spikes = spikes[:, slice_index].sum()
-        logger.info("Found '%s' spike(s) at slice '%s' between timepoints '%s'.",
-                    nb_spikes, slice_index, spikes[:, slice_index])
+        logger.info("Found '%s' spike(s) at slice '%s' between timepoints '%s' "
+                    ". The lower spikes are '%s'.", nb_spikes, slice_index,
+                    spikes[:, slice_index], lower_spikes[:, slice_index])
       
         # Consider as spike point next to isolated dirak-like spike if they have
         # high rank. Isolated dirak-like spike are those that have no temporal
         # neighbor. High rank : if the rank of the point is within 2*nb_spikes.
         if histeresis:
-
-            # The argsort of argsort gives the rank of the original idx, ie.
-            # if we have [2, 9, 1, 4, 3] the rank will be [1, 4, 0, 3, 2].
-            # The rank of the first element is 1 since 2 is the second smallest
-            # value.
-            ranks = np.argsort(np.argsort(smd2[:, slice_index]))
-            logger.info("The rank index of '%s' is '%s'.",
-                        smd2[:, slice_index], ranks)
-
-            # Detect the 'diracs' in the time dimension 
-            diracs = detect_dirac_spikes(spikes[:, slice_index])
-            index_diracs = np.where(diracs)[0]       
-            logger.info("Diracs indices are '%s'.", index_diracs)
-
-            # Go through the found dirac-like indices
-            for dirac_index in index_diracs:
-
-                # Get the rank of the current dirac-like spike
-                dirac_rank = ranks[dirac_index]
-                logger.info("The rank associated to the dirac index '%s' is "
-                             "'%s'.", dirac_index, dirac_rank)
-
-                # Find in the direct neighbor the closest dirac rank
-                # > consider the max between the one before and the one after
-                if (dirac_index > 0) and (dirac_index < shape[0] - 1):
-                    lower_dirac_rank = ranks[dirac_index - 1]
-                    upper_dirac_rank = ranks[dirac_index + 1]
-                    max_dirac_rank = np.max([lower_dirac_rank, upper_dirac_rank])
-                # > consider the one after
-                elif dirac_index == 0:
-                    max_dirac_rank = ranks[dirac_index + 1]
-                # > consider the one before
-                elif dirac_index == shape[0] - 1:
-                    max_dirac_rank = ranks[dirac_index - 1]
-                logger.info("The neighbor closest dirac rank is '%s'.",
-                            max_dirac_rank)
-
-                # Check if those two ranks are closed enough, ie. close
-                # within the number of detected spikes.
-                if np.abs(dirac_rank - max_dirac_rank) <= hthres * nb_spikes:
-                    spikes[max_dirac_rank, slice_index] = 1
-                    logger.info("Found one spike by histeresis at position "
-                                "'%s'.", max_dirac_rank)
+            spikes[:, slice_index] += add_histeresis(
+                smd2[:, slice_index], spikes[:, slice_index],
+                lower_spikes[:, slice_index], hthres=hthres)
 
     return spikes
 
 
+def detect_pattern(array, pattern, ppos=None, dpos=0):
+    """ Detect a pattern in the fisrt axis of a numpy array.
+
+    Parameters
+    ----------
+    array: array (N, M)
+        the input data - pattern is search over axis 0.
+    pattern: 1-dimension array or list
+        the pattern to detect.
+    ppos: 's'|'e'|integer | None
+        pattern position: a specific position in time to detect the pattern, 
+        None means over all possible axis 0 positions.
+    dpos: integer
+        where to put '1' or 'True' in the result array when pattern is detected
+        (0: start of pattern).
+
+    Returns
+    -------
+    hits: array (N, M)
+        the match result.
+
+    Raises
+    ------
+    ValueError: if a wrong pattern is specified.  
+    """
+    # Inner parameters
+    shape = array.shape
+    hits = np.zeros(shape, dtype=np.bool)
+    pattern = np.asarray(pattern)
+    pshape = pattern.shape
+
+    # Check the input parameters
+    if pattern.ndim != 1:
+         raise ValueError("Invalid pattern '{0}'.".format(pattern))
+
+    # Pattern instersection
+    nb_of_hits = shape[0] - pshape[0] + 1
+    hits = np.ones((nb_of_hits, shape[1]), dtype=np.bool)
+    for cnt, pattern_value in enumerate(pattern):
+        local_match = (array[cnt: cnt + nb_of_hits, :] == pattern_value)
+        hits = np.logical_and(hits, local_match)
+
+    return hits
+
+
 def final_detection(spikes):
-    """ 
-    This function takes an array with zeros or ones, look at when two "ones" 
-    follow each other in the time direction (first dimension), and return 
+    """ This function takes an array with zeros or ones, look at when two 
+    "ones" follow each other in the time direction (first dimension), and return 
     an array of ones in these cases. These are the slices that we can 
     potentially correct if they are isolated. 
 
@@ -301,28 +410,41 @@ def final_detection(spikes):
     # Initialize the detection result 
     shape = spikes.shape
     final = np.zeros(shape=(shape[0] + 1, shape[1]), dtype=np.int)
+
+    # Detect patterns of interest
+    final[0] = detect_pattern(spikes[0: 2], [1, 0])[0]
+    final[2: shape[0] - 1] += detect_pattern(spikes, [0, 1, 1, 0])
+    final[-1] += detect_pattern(spikes[-3:], [0, 1, 1])[0]
+    final[-1] += detect_pattern(spikes[-2:], [0, 1])[0]
+
+    # Information message
+    logger.info("The final spike detection matrix is '%s' when looking for "
+                "global pattern [0, 1, 1, 0], begining pattern [1, 0] and "
+                "final patterns [0, 1, 1] and [0, 1].", final)
+
+    return final
     
     # First compute where there should be some spikes, ie. where we have 2
     # consecutive ones in the spikes array 
-    final[1:-1, :] = spikes[:-1, :] + spikes[1:, :]
-    
+    #final[1:-1, :] = spikes[:-1, :] + spikes[1:, :]
+   
     # Special case: deal with the first time point
     # > if there is a 2 at time zero, this means that there's
     # also a spike detected at time 1: it has a neighbor. Put those point at 0.
     # > if there is a 1, this means there is no neighbor therefore
     # the first time should be bad. Put those point at 2.
-    final[0, :] = final[1, :]
-    final[0, np.where(final[0, :] == 2)] = 0
-    final[0, np.where(final[0, :] == 1)] = 2
+    #final[0, :] = final[1, :]
+    #final[0, np.where(final[0, :] == 2)] = 0
+    #final[0, np.where(final[0, :] == 1)] = 2
     
     # Special case: deal with the laste time point
     # > same use cases as for the first time point
-    final[-1, :] = final[-2, :]
-    final[-1, np.where(final[-1, :] == 2)] = 0
-    final[-1, np.where(final[-1, :] == 1)] = 2
+    #final[-1, :] = final[-2, :]
+    #final[-1, np.where(final[-1, :] == 2)] = 0
+    #final[-1, np.where(final[-1, :] == 1)] = 2
     
     # Finally returns the spikes, ie. points at 2
-    return (final == 2).astype(int)
+    #return (final == 2).astype(int)
     
 
 def spike_detector(fname, zalph=5., histeresis=True, hthres=2., time_axis=-1,

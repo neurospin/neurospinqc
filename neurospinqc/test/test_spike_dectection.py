@@ -14,7 +14,7 @@ import numpy as np
 import logging
 
 # Spike import
-import spike.fmri_qc as fqc
+import neurospinqc.fmri_qc as fqc
 
 # Set random seed to make the test reproducible 
 np.random.seed(42)
