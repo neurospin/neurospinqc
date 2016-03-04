@@ -35,30 +35,30 @@ def detect_dirac_spikes(spikes):
     ----------
     spikes: array (T-1, S)
         the detected spikes array with only 0 (no spike) or 1 (a spike).
-    
+
     Returns
     -------
     diracs: array (T-1, S)
         the location of dirac-like spikes.
-    """    
+    """
     # If a single slice is considered, insure we have a two-dimention spikes
     # array
     if spikes.ndim == 1:
         spikes.shape += (1, )
-    
+
     # Deal with the first column
     first_row_diracs = np.logical_and((spikes[0, :] == 1), (spikes[1, :] == 0))
 
     # Deal with the last column
     last_row_diracs = np.logical_and((spikes[-1, :] == 1), (spikes[-2, :] == 0))
 
-    # Deal now with the rest 
+    # Deal now with the rest
     nb_of_timepoints = spikes.shape[0]
     others = np.logical_and((spikes[1: nb_of_timepoints - 1, :] == 1),
                             (spikes[2: nb_of_timepoints, :] == 0))
     others = np.logical_and((spikes[0: nb_of_timepoints - 2, :] == 0), others)
 
-    # Concatenate the result  
+    # Concatenate the result
     diracs = np.vstack((first_row_diracs, others, last_row_diracs))
 
     return diracs
@@ -109,6 +109,7 @@ def display_spikes(smd2, spikes, output_fname):
     # Save the figure
     plt.savefig(output_fname)
 
+
 def detect_spikes(array, zalph=5., histeresis=True, hthres=2., time_axis=-1,
                   slice_axis=-2, output_fname=None):
     """ Detect spiked slices.
@@ -124,7 +125,7 @@ def detect_spikes(array, zalph=5., histeresis=True, hthres=2., time_axis=-1,
     hthres: float
         cut off for histeresis : keep point under threshold Zalph if their rank
         is within hthres times the number of spikes detected. For example, if
-        3 spikes are detected, and hthres is 2., keep point whose ranks are  
+        3 spikes are detected, and hthres is 2., keep point whose ranks are
         highest than 2.*3.
     time_axis: int (optional, default -1)
         axis of the input array that varies over time. The default is the last
@@ -154,7 +155,7 @@ def detect_spikes(array, zalph=5., histeresis=True, hthres=2., time_axis=-1,
     logger.info("Computing time-point to time-point differences over slices...")
     smd2 = time_slice_diffs(array)
     logger.info("Metric smd2 shape is '%s', ie. (number of timepoints - 1, "
-                "number of slices).", smd2.shape)   
+                "number of slices).", smd2.shape)
 
     # Detect spikes from quared difference
     spikes = spikes_from_slice_diff(smd2, zalph, histeresis, hthres)
@@ -202,11 +203,11 @@ def add_histeresis(smd2, spikes, lower_spikes, hthres=.15):
     Returns
     -------
     histeresis_spikes: array (T-1,)
-        the detected histeresis spikes.   
+        the detected histeresis spikes.
 
     Raises
     ------
-    ValueError: if smd2 or spikes arrays have not dimention one.    
+    ValueError: if smd2 or spikes arrays have not dimention one.
     """
     # Check the input specified axis parameters
     if smd2.ndim != 1:
@@ -227,9 +228,9 @@ def add_histeresis(smd2, spikes, lower_spikes, hthres=.15):
     ranks = np.argsort(np.argsort(smd2))
     logger.info("The rank index of '%s' is '%s'.", smd2, ranks)
 
-    # Detect the 'diracs' in the time dimension 
+    # Detect the 'diracs' in the time dimension
     diracs = detect_dirac_spikes(spikes)
-    index_diracs = np.where(diracs)[0]       
+    index_diracs = np.where(diracs)[0]
     logger.info("Diracs indices are '%s'.", index_diracs)
 
     # Go through the found dirac-like indices
@@ -238,19 +239,19 @@ def add_histeresis(smd2, spikes, lower_spikes, hthres=.15):
         # Get the rank of the current dirac-like spike
         dirac_rank = ranks[dirac_index]
         logger.info("The rank associated to the dirac index '%s' is "
-                     "'%s'.", dirac_index, dirac_rank)
+                    "'%s'.", dirac_index, dirac_rank)
 
         # Find in the direct neighbor the closest dirac rank
         # > consider the max between the one before and the one after
         if (dirac_index > 0) and (dirac_index < shape[0] - 1):
             lower_dirac_rank = ranks[dirac_index - 1]
             upper_dirac_rank = ranks[dirac_index + 1]
-            if lower_dirac_rank > upper_dirac_rank:      
+            if lower_dirac_rank > upper_dirac_rank:
                 max_dirac_rank = lower_dirac_rank
                 histeresis_index = dirac_index - 1
             else:
                 max_dirac_rank = upper_dirac_rank
-                histeresis_index = dirac_index + 1              
+                histeresis_index = dirac_index + 1
         # > consider the one after
         elif dirac_index == 0:
             max_dirac_rank = ranks[dirac_index + 1]
@@ -268,7 +269,7 @@ def add_histeresis(smd2, spikes, lower_spikes, hthres=.15):
 
         # Check if those two ranks are closed enough, ie. close
         # within the number of detected spikes.
-        if (dirac_rank - max_dirac_rank <= hthres * dirac_rank + 1 and 
+        if (dirac_rank - max_dirac_rank <= hthres * dirac_rank + 1 and
             lower_spikes[histeresis_index]):
 
             histeresis_spikes[histeresis_index] = 1
@@ -293,16 +294,16 @@ def spikes_from_slice_diff(smd2, zalph=5., lower_zalph=3., histeresis=True,
     zalph: float (optional default 5)
         cut off for the sum of square.
     lower_zalph: float (optional default 3)
-        lower cut off for the sum of square. Used to detect histeresis spikes. 
+        lower cut off for the sum of square. Used to detect histeresis spikes.
         Value must be above this threshold to be a candidate for histeresis.
     histeresis: bool (default True)
         option to consider histeresis-like spikes.
     hthres: float
         cut off for histeresis: keep point under threshold zalph if their rank
         is within hthres times the number of spikes detected. For example, if
-        3 spikes are detected, and hthres is 2., keep point whose ranks are  
-        highest than 2.*3. 
-    
+        3 spikes are detected, and hthres is 2., keep point whose ranks are
+        highest than 2.*3.
+
     Returns
     -------
     spikes: array (T-1, S)
@@ -327,14 +328,14 @@ def spikes_from_slice_diff(smd2, zalph=5., lower_zalph=3., histeresis=True,
         scale = median_absolute_deviation(smd2[:, slice_index])
 
         # Detect the outliers
-        spikes[:, slice_index] = (smd2[:, slice_index] >  loc + zalph * scale)
-        lower_spikes[:, slice_index] = (smd2[:, slice_index] >  loc +
+        spikes[:, slice_index] = (smd2[:, slice_index] > loc + zalph * scale)
+        lower_spikes[:, slice_index] = (smd2[:, slice_index] > loc +
                                         lower_zalph * scale)
         nb_spikes = spikes[:, slice_index].sum()
         logger.info("Found '%s' spike(s) at slice '%s' between timepoints '%s' "
                     ". The lower spikes are '%s'.", nb_spikes, slice_index,
                     spikes[:, slice_index], lower_spikes[:, slice_index])
-      
+
         # Consider as spike point next to isolated dirak-like spike if they have
         # high rank. Isolated dirak-like spike are those that have no temporal
         # neighbor. High rank : if the rank of the point is within 2*nb_spikes.
@@ -356,7 +357,7 @@ def detect_pattern(array, pattern, ppos=None, dpos=0):
     pattern: 1-dimension array or list
         the pattern to detect.
     ppos: 's'|'e'|integer | None
-        pattern position: a specific position in time to detect the pattern, 
+        pattern position: a specific position in time to detect the pattern,
         None means over all possible axis 0 positions.
     dpos: integer
         where to put '1' or 'True' in the result array when pattern is detected
@@ -369,7 +370,7 @@ def detect_pattern(array, pattern, ppos=None, dpos=0):
 
     Raises
     ------
-    ValueError: if a wrong pattern is specified.  
+    ValueError: if a wrong pattern is specified.
     """
     # Inner parameters
     shape = array.shape
@@ -379,7 +380,7 @@ def detect_pattern(array, pattern, ppos=None, dpos=0):
 
     # Check the input parameters
     if pattern.ndim != 1:
-         raise ValueError("Invalid pattern '{0}'.".format(pattern))
+        raise ValueError("Invalid pattern '{0}'.".format(pattern))
 
     # Pattern instersection
     nb_of_hits = shape[0] - pshape[0] + 1
@@ -392,22 +393,22 @@ def detect_pattern(array, pattern, ppos=None, dpos=0):
 
 
 def final_detection(spikes):
-    """ This function takes an array with zeros or ones, look at when two 
-    "ones" follow each other in the time direction (first dimension), and return 
-    an array of ones in these cases. These are the slices that we can 
-    potentially correct if they are isolated. 
+    """ This function takes an array with zeros or ones, look at when two
+    "ones" follow each other in the time direction (first dimension), and
+    return an array of ones in these cases. These are the slices that we
+    can potentially correct if they are isolated.
 
     Parameters
     ----------
     spikes: array (T-1, S)
         the detected spikes array.
-    
+
     Returns
     -------
     final: array (T, S)
-        the spikes array. 
+        the spikes array.
     """
-    # Initialize the detection result 
+    # Initialize the detection result
     shape = spikes.shape
     final = np.zeros(shape=(shape[0] + 1, shape[1]), dtype=np.int)
 
@@ -423,11 +424,11 @@ def final_detection(spikes):
                 "final patterns [0, 1, 1] and [0, 1].", final)
 
     return final
-    
+
     # First compute where there should be some spikes, ie. where we have 2
-    # consecutive ones in the spikes array 
+    # consecutive ones in the spikes array
     #final[1:-1, :] = spikes[:-1, :] + spikes[1:, :]
-   
+
     # Special case: deal with the first time point
     # > if there is a 2 at time zero, this means that there's
     # also a spike detected at time 1: it has a neighbor. Put those point at 0.
@@ -436,16 +437,16 @@ def final_detection(spikes):
     #final[0, :] = final[1, :]
     #final[0, np.where(final[0, :] == 2)] = 0
     #final[0, np.where(final[0, :] == 1)] = 2
-    
+
     # Special case: deal with the laste time point
     # > same use cases as for the first time point
     #final[-1, :] = final[-2, :]
     #final[-1, np.where(final[-1, :] == 2)] = 0
     #final[-1, np.where(final[-1, :] == 1)] = 2
-    
+
     # Finally returns the spikes, ie. points at 2
     #return (final == 2).astype(int)
-    
+
 
 def spike_detector(fname, zalph=5., histeresis=True, hthres=2., time_axis=-1,
                    slice_axis=-2):
@@ -462,7 +463,7 @@ def spike_detector(fname, zalph=5., histeresis=True, hthres=2., time_axis=-1,
     hthres: float
         cut off for histeresis : keep point under threshold Zalph if their rank
         is within hthres times the number of spikes detected. For example, if
-        3 spikes are detected, and hthres is 2., keep point whose ranks are  
+        3 spikes are detected, and hthres is 2., keep point whose ranks are
         highest than 2.*3.
     time_axis: int (optional, default -1)
         axis of the input array that varies over time. The default is the last
@@ -495,5 +496,3 @@ def spike_detector(fname, zalph=5., histeresis=True, hthres=2., time_axis=-1,
         time_axis=time_axis, slice_axis=slice_axis)
 
     return slices_to_correct, spikes
-
-

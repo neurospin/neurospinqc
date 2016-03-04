@@ -16,7 +16,7 @@ import logging
 # Spike import
 import neurospinqc.fmri_qc as fqc
 
-# Set random seed to make the test reproducible 
+# Set random seed to make the test reproducible
 np.random.seed(42)
 
 
@@ -30,7 +30,7 @@ class TestSpikeDetector(unittest.TestCase):
         ----------
         shape: tuple (mandatory)
             the final random array shape.
-        
+
         Returns
         -------
         out: array
@@ -42,7 +42,7 @@ class TestSpikeDetector(unittest.TestCase):
         """ Add spikes to an array volume.
 
         .. note:
-            
+
             The function modify the input data array.
 
         Parameters
@@ -56,8 +56,8 @@ class TestSpikeDetector(unittest.TestCase):
             a value that will be added to the spiked slices.
         scales: float (optional default 1)
             a scale factor that will be applied on spikes slices.
-        """       
-        # Check the time values are less than number of time points 
+        """
+        # Check the time values are less than number of time points
         assert np.all(np.asarray(spikes.keys()) < array.shape[-1])
 
         # Check the slices values are less than number of slices
@@ -69,7 +69,7 @@ class TestSpikeDetector(unittest.TestCase):
             array[..., timeslices, timepoint] *= scale
             array[..., timeslices, timepoint] += offset
 
-    #def dummy_bold_img(sh=(4,4,5,17), sli=(range(5), [0, 2, 4]), tim=(2,10)): 
+    #def dummy_bold_img(sh=(4,4,5,17), sli=(range(5), [0, 2, 4]), tim=(2,10)):
     #    d = make_data(sh)
     #    d = make_bad_slices(d, sli, tim)
     #    assert len(d.shape) == 4
@@ -111,7 +111,7 @@ class TestSpikeDetector(unittest.TestCase):
             for each timepoints (the integer dictionary keys), associate a list
             of slices to spike.
         """
-        slices_to_correct =  self.one_detection(shape, spikes)
+        slices_to_correct = self.one_detection(shape, spikes)
         print("\n--", slices_to_correct)
         self.assertEqual(spikes.keys(), slices_to_correct.keys())
         for key in slices_to_correct:
@@ -121,7 +121,7 @@ class TestSpikeDetector(unittest.TestCase):
     def test_single_left_dirac_spike_detection(self):
         """ Detect a single left dirac spike.
         """
-        shape  = (4, 4, 5, 17)
+        shape = (4, 4, 5, 17)
         spikes = {
             0: [3, ]
         }
@@ -130,7 +130,7 @@ class TestSpikeDetector(unittest.TestCase):
     def test_single_right_dirac_spike_detection(self):
         """ Detect a single right dirac spike.
         """
-        shape  = (4, 4, 5, 17)
+        shape = (4, 4, 5, 17)
         spikes = {
             16: [3, ]
         }
@@ -139,7 +139,7 @@ class TestSpikeDetector(unittest.TestCase):
     def test_single_central_dirac_spike_detection(self):
         """ Detect a single central dirac spike.
         """
-        shape  = (4, 4, 5, 17)
+        shape = (4, 4, 5, 17)
         spikes = {
             9: [2, ]
         }
@@ -148,13 +148,12 @@ class TestSpikeDetector(unittest.TestCase):
     def test_multiple_spikes_detection(self):
         """ Detect a single central dirac spike.
         """
-        shape  = (4, 4, 5, 17)
+        shape = (4, 4, 5, 17)
         spikes = {
             9: [2, 3, ],
             3: [1, ]
         }
         self.run_test(shape, spikes)
-
 
 
 def test():
@@ -170,5 +169,3 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.ERROR)
 
     test()
-
-

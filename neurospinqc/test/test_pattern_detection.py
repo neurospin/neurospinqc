@@ -50,7 +50,7 @@ class TestPatternDetector(unittest.TestCase):
         except:
             raise ValueError("Invalid pattern position '({0}, {1})'.".format(
                 time_index, slice_index))
-        
+
         return array
 
     def test_matrix_pattern_creation(self):
@@ -99,5 +99,3 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.ERROR)
 
     test()
-
-

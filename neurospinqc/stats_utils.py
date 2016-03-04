@@ -75,7 +75,7 @@ def time_slice_diffs(array):
 
     Parameters
     ----------
-    array: array_like (T, S, ...) 
+    array: array_like (T, S, ...)
         array over which to calculate time and slice differences. The time axis
         is 0 and the slice axis is 1. See the `format_time_serie` function
         to format properly the array.
@@ -83,7 +83,7 @@ def time_slice_diffs(array):
     Returns
     -------
     smd2: array (T-1, S)
-        slice mean squared difference: giving the mean (over voxels in slice) 
+        slice mean squared difference: giving the mean (over voxels in slice)
         of the difference from one time point to the next, one value per slice,
         per timepoint
     """
@@ -130,6 +130,6 @@ def median_absolute_deviation(array, c=scipy.stats.norm.ppf(3/4.), axis=0,
     # Compute the center if a callable is passed in parameters
     if callable(center):
         center = np.apply_over_axes(center, array, axis)
-    
+
     # Compute the median absolute deviation
     return np.median((np.fabs(array - center)) / c, axis=axis)

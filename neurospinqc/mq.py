@@ -69,8 +69,8 @@ def deformation_field(rigid, shape, spacing, origin):
     mesh = numpy.meshgrid(x, y, z)
     for item in mesh:
         item.shape += (1, )
-    mesh = numpy.concatenate(mesh , axis=3)
-            
+    mesh = numpy.concatenate(mesh, axis=3)
+
     # Apply the rigid transform
     points = field_add(mesh, -numpy.asarray(origin))
     wrap_points = field_add(field_dot(rigid[:3, :3], points), rigid[:3, 3])
@@ -122,7 +122,6 @@ def field_add(field, vector):
     return field
 
 
-
 if __name__ == "__main__":
 
     # Z-rotation of alpha + translation
@@ -130,16 +129,15 @@ if __name__ == "__main__":
     trans = [0, 0, 0]
     rigid = numpy.array([
         [numpy.cos(alpha), -numpy.sin(alpha), 0, trans[0]],
-        [numpy.sin(alpha), numpy.cos(alpha),0, trans[1]],
+        [numpy.sin(alpha), numpy.cos(alpha), 0, trans[1]],
         [0, 0, 1, trans[2]],
         [0, 0, 0, 1]
-    ],dtype=numpy.single)
+    ], dtype=numpy.single)
 
-    # Compute the dispalcement
-    dispalcement = deformation_field(rigid, (2, 2, 2), (1, 1, 1), (0, 0, 0))
-    print dispalcement
+    # Compute the displacement
+    displacement = deformation_field(rigid, (2, 2, 2), (1, 1, 1), (0, 0, 0))
+    print displacement
 
     # Compute the mq
     mq = mq(rigid, (2, 2, 2), (1, 1, 1), (0, 0, 0), "stat")
-    print mq   
-                     
+    print mq
